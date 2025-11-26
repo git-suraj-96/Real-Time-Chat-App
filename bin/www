@@ -1,0 +1,184 @@
+#!/usr/bin/env node
+
+const cookie = require("cookie");
+const jwt = require("jsonwebtoken");
+
+/**
+ * Module dependencies.
+ */
+
+var app = require("../app");
+var debug = require("debug")("chatapp:server");
+var http = require("http");
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || "3000");
+app.set("port", port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+// This code snippet is setting up a WebSocket server using Socket.IO.
+var { Server } = require("socket.io");
+var io = new Server(server);
+module.exports.io = io;
+
+const onlineUsers = new Map();  // <-- FIXED
+
+io.on("connection", async (socket) => {
+
+  console.log("User connected to server.");
+
+  let decoded;
+  let user = null;
+  let socketId = socket.id;
+
+  try {
+    const cookies = cookie.parse(socket.handshake.headers.cookie || "");
+
+    if (cookies.token) {
+      decoded = jwt.verify(cookies.token, process.env.JWT_SECRET);
+
+      const userModel = require("../routes/users");
+      user = await userModel.findOne({ email: decoded.email });
+
+      if (user) {
+        user.socketId = socketId;
+        user.status = "online";
+        await user.save();
+
+        // ---- ADD TO onlineUsers MAP ----
+        onlineUsers.set(socketId, {
+          fullname: user.fullname,
+        });
+
+        // Emit to all clients
+        io.emit('onlineusers',
+          Array.from(onlineUsers.entries()).map(([id, info]) => ({
+            socketId: id,
+            fullname: info.fullname,
+            email: info.email
+          }))
+        );
+
+        console.log("Socket ID saved:", socketId);
+      }
+    }
+  } catch (err) {
+    console.log("Token error:", err.message);
+  }
+
+
+  // --- MESSAGE EVENT ---
+  socket.on("message", ({ msg, id }) => {
+    io.to(id).emit("msg", {
+      from: socket.id,
+      msg,
+      fullname : user.fullname
+    });
+
+    console.log("message:", msg);
+    console.log("ReceiverAdd:", id);
+  });
+
+
+  // --- DISCONNECT EVENT ---
+  socket.on("disconnect", async () => {
+
+    // ---- REMOVE FROM onlineUsers MAP ----
+    onlineUsers.delete(socket.id);
+
+    io.emit('onlineusers',
+      Array.from(onlineUsers.entries()).map(([id, info]) => ({
+        socketId: id,
+        fullname: info.fullname,
+      }))
+    );
+
+    console.log("User disconnected:", socket.id);
+
+    try {
+      if (user) {
+        user.socketId = "";
+        user.status = "offline";
+        await user.save();
+        console.log("User socketId cleared");
+      }
+    } catch (err) {
+      console.log("Disconnect error:", err.message);
+    }
+
+  });
+
+});
+
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on("error", onError);
+server.on("listening", onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== "listen") {
+    throw error;
+  }
+
+  var bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case "EACCES":
+      console.error(bind + " requires elevated privileges");
+      process.exit(1);
+      break;
+    case "EADDRINUSE":
+      console.error(bind + " is already in use");
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
+  debug("Listening on " + bind);
+}
