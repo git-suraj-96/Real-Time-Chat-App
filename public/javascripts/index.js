@@ -18,6 +18,7 @@ const userChatBox = document.querySelector(".user-chat-box");
 const flashMessage = document.querySelector(".flash-message");
 
 const arrowBackBtn = document.querySelector(".arrow-back");
+const hello = document.querySelector(".hello");
 
 let receiverSocketId = null;
 
@@ -97,7 +98,7 @@ chatsBox.addEventListener("click", (e) => {
   chatBoxUserStatus.innerHTML = status;
   chatBox.style.display = "block";
 
-  console.log("Receiver:", receiverSocketId);
+  // console.log("Receiver:", receiverSocketId);
 });
 
 /* ------------------------------------------
@@ -119,22 +120,17 @@ sendBtn.addEventListener("click", () => {
    RECEIVE MESSAGE
 ------------------------------------------- */
 socket.on("msg", (data) => {
-  console.log("MESSAGE RECEIVED:", data);
-  console.log("SenderId: ", data.from);
-  console.log("Message: ", data.msg);
+  // console.log("MESSAGE RECEIVED:", data);
+  // console.log("SenderId: ", data.from);
+  // console.log("Message: ", data.msg);
   flashMessage.innerHTML = `You have received message from ${data.fullname}`;
   flashMessage.style.display = "block";
   createLeftSide(data.msg);
+  hello.scroll(0, hello.scrollHeight + 1000);
   setTimeout(()=>{
     flashMessage.style.display = "none";
   }, 3000);
 
-  // You can display message inside chat box here
-  // Example (if you have a messages div):
-  //
-  // let msgEl = document.createElement("p");
-  // msgEl.innerText = `${data.from}: ${data.msg}`;
-  // document.querySelector(".messages").appendChild(msgEl);
 });
 
 /* ------------------------------------------
