@@ -126,6 +126,7 @@ socket.on("msg", (data) => {
   flashMessage.innerHTML = `You have received message from ${data.fullname}`;
   flashMessage.style.display = "block";
   createLeftSide(data.msg);
+  navigator.vibrate([200, 100, 200]);
   hello.scroll(0, hello.scrollHeight + 1000);
   setTimeout(()=>{
     flashMessage.style.display = "none";
