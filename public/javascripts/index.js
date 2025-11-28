@@ -173,3 +173,150 @@ socket.on("onlineusers", (users) => {
 arrowBackBtn.addEventListener("click", ()=>{
     chatBox.style.display = "none";
 })
+
+// all function where call will conected to each other
+let peerConnection = new RTCPeerConnection()
+let localStream;
+let remoteStream;
+let answerUrl;
+
+let init = async () => {
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false})
+    remoteStream = new MediaStream()
+    document.getElementById('user-1').srcObject = localStream
+    document.getElementById('user-2').srcObject = remoteStream
+
+    localStream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, localStream);
+    });
+
+    peerConnection.ontrack = (event) => {
+        event.streams[0].getTracks().forEach((track) => {
+        remoteStream.addTrack(track);
+        });
+    };
+}
+
+
+let createOffer = () => {
+    return new Promise(async (resolve) => {
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                offerUrl = JSON.stringify(peerConnection.localDescription);
+            } else {
+                // null candidate = ICE finished
+                resolve(offerUrl);
+            }
+        };
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+    });
+};
+
+
+let createAnswer = (offerUrl) => {
+    return new Promise(async (resolve) => {
+
+        let offer = JSON.parse(offerUrl);
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                answerUrl = JSON.stringify(peerConnection.localDescription);
+            } else {
+                // null ICE candidate means ICE gathering finished
+                resolve(answerUrl);
+            }
+        };
+
+        await peerConnection.setRemoteDescription(offer);
+
+        let answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+    });
+};
+
+
+let addAnswer = async (repliedanswer) => {
+    console.log('Add answer triggerd')
+    let answer = JSON.parse(repliedanswer)
+    console.log('answer:', answer)
+    if (!peerConnection.currentRemoteDescription){
+        peerConnection.setRemoteDescription(answer);
+    }
+}
+
+
+
+
+// Video-call handle code yahan hai
+const muteBtn = document.querySelector(".mute");
+const speakerBtn = document.querySelector(".speaker");
+const endCallBtn = document.querySelector('.call-end');
+let muteGray = true;
+let speakerGray = true;
+const videoContainer = document.querySelector(".video-container");
+const pickupCallBox = document.querySelector(".pickup-call-box");
+const pickupCallBoxPickup = document.querySelector(".pickup-call");
+const pickupCallBoxEnd = document.querySelector(".cut-call");
+
+muteBtn.addEventListener('click', ()=>{
+  if(muteGray){
+    muteBtn.style.backgroundColor = "gray";
+    muteGray = false
+  }else{
+    muteBtn.style.backgroundColor = "white";
+    muteGray = true;
+  }
+})
+
+speakerBtn.addEventListener('click', ()=>{
+  if(speakerGray){
+    speakerBtn.style.backgroundColor = "gray";
+    speakerGray = false
+  }else{
+    speakerBtn.style.backgroundColor = "white";
+    speakerGray = true;
+  }
+})
+
+const videoCallBtn = document.querySelector('.video-call-btn');
+
+videoCallBtn.addEventListener('click',async  ()=>{
+  videoContainer.style.display = 'block';
+  await init();
+  let url = await createOffer();   // WAIT for ICE done 
+  // console.log((url));
+  socket.emit('offer', {sender : socket.id, receiver :  receiverSocketId, senderAdd : url});
+})
+
+endCallBtn.addEventListener('click', ()=>{
+  videoContainer.style.display = 'none';
+})
+
+let senderadd;
+let sender;
+socket.on('haveOffer', (data)=>{
+  console.log(data.senderAdd);
+  senderadd = data.senderAdd;    // FIXED
+  sender = data.sender;
+  pickupCallBox.style.display = 'inline-flex';
+  
+});
+
+pickupCallBoxPickup.addEventListener('click', async ()=>{
+    pickupCallBox.style.display = 'none';
+    await init();
+    console.log(senderadd);
+    let url = await createAnswer(senderadd);  
+    console.log(url);      
+    videoContainer.style.display = 'block';   
+    socket.emit('answer', {answer : url, receiver : sender});
+});
+
+
+socket.on('replied-answer', (data)=>{
+  console.log(data);
+  addAnswer(data.answer);
+})

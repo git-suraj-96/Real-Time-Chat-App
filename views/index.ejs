@@ -48,19 +48,106 @@
         margin-left: 5px;
         display: none;
       }
-      @media (max-width:1020px) {
-        main{
+
+      .video-container {
+        position: absolute;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgb(57, 57, 57);
+        top: 0px;
+        display: flex;
+        flex-direction: column;
+        gap: 2em;
+        display: none;
+      }
+      .video-player {
+        background-color: black;
+      }
+      #user-2 {
+        position: absolute;
+        height: 99%;
+        width: 99%;
+        margin-left: 5px;
+        box-shadow: 0px 0px 1px 1px rgb(83, 83, 83);
+      }
+      #user-1 {
+        top: 0;
+        z-index: 2;
+        margin: 10px;
+        margin-left: 15px;
+        position: absolute;
+        border: 1px solid gray;
+        border-radius: 5px;
+        height: 12rem;
+      }
+      .control-button {
+        position: absolute;
+        z-index: 10;
+        top: 75%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+        gap: 3rem;
+      }
+      .controls {
+        margin: 0 5px;
+        width: 4rem;
+        height: 4rem;
+        border-radius: 50%;
+        background-color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .call-end {
+        background-color: red;
+      }
+      .pickup-call-box {
+        width: 20rem;
+        padding: 32px;
+        background-color: white;
+        border-radius: 19px;
+        position: absolute;
+        top: 109px;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        display: none;
+      }
+      .p-c-b-call{
+        width: 4rem;
+        height: 4rem;
+        border-radius: 50%;
+        align-items: center;
+        justify-items: center;
+      }
+      .cut-call{
+        background-color: red;
+      }
+      .pickup-call{
+        background-color: green;
+      }
+
+      @media (max-width: 1020px) {
+        main {
           position: absolute;
           width: 100%;
         }
-        .flash-message{
+        .flash-message {
           top: 83px;
           right: 29px;
           z-index: 10;
-
         }
       }
-     
     </style>
     <script id="tailwind-config">
       tailwind.config = {
@@ -245,7 +332,7 @@
                 </div>
                 <div class="flex items-center space-x-2">
                   <button
-                    class="rounded-full p-2 text-text-secondary-light hover:bg-gray-200/50 dark:text-text-secondary-dark dark:hover:bg-white/10"
+                    class="rounded-full p-2 text-text-secondary-light hover:bg-gray-200/50 dark:text-text-secondary-dark dark:hover:bg-white/10 video-chat video-call-btn"
                   >
                     <span class="material-symbols-outlined">videocam</span>
                   </button>
@@ -266,9 +353,7 @@
                 <div class="absolute inset-0 chat-bg"></div>
                 <div
                   class="relative z-10 flex flex-col gap-2 p-4 sm:p-6 user-chat-box"
-                >
-                 
-                </div>
+                ></div>
               </div>
               <!-- Message Input -->
               <footer
@@ -301,6 +386,32 @@
     </div>
 
     <div class="flash-message">Your received a message from user.</div>
+
+    <div class="video-container">
+      <video class="video-player" id="user-1" autoplay playsinline></video>
+      <video class="video-player" id="user-2" autoplay playsinline></video>
+      <div class="control-button">
+        <button class="controls mute">
+          <img src="/images/staticImages/mute.png" alt="MUTE" />
+        </button>
+        <button class="controls call-end">
+          <img src="/images/staticImages/telephone.png" alt="END" />
+        </button>
+        <button class="controls speaker">
+          <img src="/images/staticImages/volume-high.png" alt="VOLUME" />
+        </button>
+      </div>
+    </div>
+
+    <!-- receiver side pop up for pickup call -->
+    <div class="pickup-call-box">
+      <button class="cut-call p-c-b-call">
+        <img  src="/images/staticImages/telephone.png" alt="End Calll" />
+      </button>
+      <button class="pickup-call p-c-b-call">
+        <img src="/images/staticImages/telephone.png" alt="PickupCal" />
+      </button>
+    </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/javascripts/index.js"></script>
   </body>
