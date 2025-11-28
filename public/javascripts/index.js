@@ -174,11 +174,53 @@ arrowBackBtn.addEventListener("click", ()=>{
     chatBox.style.display = "none";
 })
 
-// all function where call will conected to each other
+
+
+
+
+
+
+
+
+// Video-call handle code yahan hai
+const muteBtn = document.querySelector(".mute");
+const speakerBtn = document.querySelector(".speaker");
+const endCallBtn = document.querySelector('.call-end');
+let muteGray = true;
+let speakerGray = true;
+const videoContainer = document.querySelector(".video-container");
+const pickupCallBox = document.querySelector(".pickup-call-box");
+const pickupCallBoxPickup = document.querySelector(".pickup-call");
+const pickupCallBoxEnd = document.querySelector(".cut-call");
+const videoCallBtn = document.querySelector('.video-call-btn');
+
+
+// it will create gray color of mute btn while user click on that
+muteBtn.addEventListener('click', ()=>{
+  if(muteGray){
+    muteBtn.style.backgroundColor = "gray";
+    muteGray = false
+  }else{
+    muteBtn.style.backgroundColor = "white";
+    muteGray = true;
+  }
+})
+
+// when user click on the speaker btn then it will do gray colo
+speakerBtn.addEventListener('click', ()=>{
+  if(speakerGray){
+    speakerBtn.style.backgroundColor = "gray";
+    speakerGray = false
+  }else{
+    speakerBtn.style.backgroundColor = "white";
+    speakerGray = true;
+  }
+})
+
+// main function that handle video calling
 let peerConnection = new RTCPeerConnection()
 let localStream;
 let remoteStream;
-let answerUrl;
 
 let init = async () => {
     localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true})
@@ -197,50 +239,44 @@ let init = async () => {
     };
 }
 
-
-let createOffer = () => {
-    return new Promise(async (resolve) => {
-
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                offerUrl = JSON.stringify(peerConnection.localDescription);
-            } else {
-                // null candidate = ICE finished
-                resolve(offerUrl);
-            }
-        };
-
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-    });
-};
+let createOffer = async () => {
 
 
-let createAnswer = (offerUrl) => {
-    return new Promise(async (resolve) => {
+    peerConnection.onicecandidate = async (event) => {
+        //Event that fires off when a new offer ICE candidate is created
+        if(event.candidate){
+            let offerPath = JSON.stringify(peerConnection.localDescription);
+            socket.emit('offer-sdp', {offerpath : offerPath, receiverId : receiverSocketId, senderId : socket.id});
+            
+        }
+    };
 
-        let offer = JSON.parse(offerUrl);
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+}
 
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                answerUrl = JSON.stringify(peerConnection.localDescription);
-            } else {
-                // null ICE candidate means ICE gathering finished
-                resolve(answerUrl);
-            }
-        };
+let createAnswer = async (sdpOffer, senderid) => {
 
-        await peerConnection.setRemoteDescription(offer);
+    let offer = JSON.parse(sdpOffer)
 
-        let answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-    });
-};
+    peerConnection.onicecandidate = async (event) => {
+        //Event that fires off when a new answer ICE candidate is created
+        if(event.candidate){
+            console.log('Adding answer candidate...:', event.candidate)
+            let sdpAnswer = JSON.stringify(peerConnection.localDescription)
+            socket.emit('sdp-answer', {answer : sdpAnswer, receiver :  senderid});
+        }
+    };
 
+    await peerConnection.setRemoteDescription(offer);
 
-let addAnswer = async (repliedanswer) => {
+    let answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer); 
+}
+
+let addAnswer = async (path) => {
     console.log('Add answer triggerd')
-    let answer = JSON.parse(repliedanswer)
+    let answer = JSON.parse(path)
     console.log('answer:', answer)
     if (!peerConnection.currentRemoteDescription){
         peerConnection.setRemoteDescription(answer);
@@ -250,73 +286,20 @@ let addAnswer = async (repliedanswer) => {
 
 
 
-// Video-call handle code yahan hai
-const muteBtn = document.querySelector(".mute");
-const speakerBtn = document.querySelector(".speaker");
-const endCallBtn = document.querySelector('.call-end');
-let muteGray = true;
-let speakerGray = true;
-const videoContainer = document.querySelector(".video-container");
-const pickupCallBox = document.querySelector(".pickup-call-box");
-const pickupCallBoxPickup = document.querySelector(".pickup-call");
-const pickupCallBoxEnd = document.querySelector(".cut-call");
-
-muteBtn.addEventListener('click', ()=>{
-  if(muteGray){
-    muteBtn.style.backgroundColor = "gray";
-    muteGray = false
-  }else{
-    muteBtn.style.backgroundColor = "white";
-    muteGray = true;
-  }
-})
-
-speakerBtn.addEventListener('click', ()=>{
-  if(speakerGray){
-    speakerBtn.style.backgroundColor = "gray";
-    speakerGray = false
-  }else{
-    speakerBtn.style.backgroundColor = "white";
-    speakerGray = true;
-  }
-})
-
-const videoCallBtn = document.querySelector('.video-call-btn');
-
-videoCallBtn.addEventListener('click',async  ()=>{
+videoCallBtn.addEventListener('click', async ()=>{
   videoContainer.style.display = 'block';
   await init();
-  let url = await createOffer();   // WAIT for ICE done 
-  // console.log((url));
-  socket.emit('offer', {sender : socket.id, receiver :  receiverSocketId, senderAdd : url});
+  createOffer();
 })
 
-endCallBtn.addEventListener('click', ()=>{
-  videoContainer.style.display = 'none';
+
+socket.on('sdp-offer', async (data)=>{
+  // console.log(data.data.offerpath);
+  videoContainer.style.display = "block";
+  await init();
+  createAnswer(data.data.offerpath, data.data.senderId);
 })
 
-let senderadd;
-let sender;
-socket.on('haveOffer', (data)=>{
-  console.log(data.senderAdd);
-  senderadd = data.senderAdd;    // FIXED
-  sender = data.sender;
-  pickupCallBox.style.display = 'inline-flex';
-  
-});
-
-pickupCallBoxPickup.addEventListener('click', async ()=>{
-    pickupCallBox.style.display = 'none';
-    await init();
-    console.log(senderadd);
-    let url = await createAnswer(senderadd);  
-    console.log(url);      
-    videoContainer.style.display = 'block';   
-    socket.emit('answer', {answer : url, receiver : sender});
-});
-
-
-socket.on('replied-answer', (data)=>{
-  console.log(data);
+socket.on('answer', (data) => {
   addAnswer(data.answer);
 })

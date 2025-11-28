@@ -89,19 +89,16 @@ io.on("connection", async (socket) => {
   
 
   //------ WHEN USER SEND VIDECALL OFFER----
-  socket.on('offer', (data)=>{
-    // console.log(data);
-    io.to(data.receiver).emit("haveOffer", {senderAdd : data.senderAdd, sender : data.sender});
+  socket.on('offer-sdp', (data)=>{
+    // console.log("ReceiverId: ", data.receiverId);
+    // console.log("SenderId: ", data.senderId);
+    // console.log("Path: ", data.offerpath);
+    io.to(data.receiverId).emit('sdp-offer', {data});
   })
 
-
-  socket.on('answer', (data)=>{
-    // console.log(data);
-    // console.log(data.answer);
-    // console.log(data.receiver);
-    io.to(data.receiver).emit('replied-answer', {answer : data.answer});
+  socket.on('sdp-answer', (data)=>{
+    io.to(data.receiver).emit('answer', {answer : data.answer});
   })
-
 
 
 
