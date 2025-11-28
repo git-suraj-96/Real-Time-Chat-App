@@ -88,20 +88,6 @@ io.on("connection", async (socket) => {
   });
   
 
-  //------ WHEN USER SEND VIDECALL OFFER----
-  socket.on('offer-sdp', (data)=>{
-    // console.log("ReceiverId: ", data.receiverId);
-    // console.log("SenderId: ", data.senderId);
-    // console.log("Path: ", data.offerpath);
-    io.to(data.receiverId).emit('sdp-offer', {data});
-  })
-
-  socket.on('sdp-answer', (data)=>{
-    io.to(data.receiver).emit('answer', {answer : data.answer});
-  })
-
-
-
   // --- DISCONNECT EVENT ---
   socket.on("disconnect", async () => {
 

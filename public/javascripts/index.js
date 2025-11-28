@@ -36,7 +36,6 @@ function getTime() {
   return `${hours}:${minutes}`;
 }
 
-
 function createLeftSide(message) {
   const child = document.createElement("div");
   child.className = "flex max-w-lg justify-start";
@@ -55,13 +54,13 @@ function createLeftSide(message) {
                         ${getTime()}
                       </p>
                     </div>`;
-    userChatBox.appendChild(child);
+  userChatBox.appendChild(child);
 }
 
-function creatRightSide(message){
-    const child = document.createElement("div");
-    child.className = "flex max-w-lg justify-end self-end";
-    child.innerHTML = `<div
+function creatRightSide(message) {
+  const child = document.createElement("div");
+  child.className = "flex max-w-lg justify-end self-end";
+  child.innerHTML = `<div
                       class="rounded-l rounded-b bg-sent-bubble-light p-2 shadow-sm dark:bg-sent-bubble-dark"
                     >
                       <p
@@ -79,7 +78,7 @@ function creatRightSide(message){
                         >
                       </p>
                     </div>`;
-    userChatBox.appendChild(child);
+  userChatBox.appendChild(child);
 }
 
 /* ------------------------------------------
@@ -128,10 +127,9 @@ socket.on("msg", (data) => {
   createLeftSide(data.msg);
   navigator.vibrate([200, 100, 200]);
   hello.scroll(0, hello.scrollHeight + 1000);
-  setTimeout(()=>{
+  setTimeout(() => {
     flashMessage.style.display = "none";
   }, 3000);
-
 });
 
 /* ------------------------------------------
@@ -170,136 +168,6 @@ socket.on("onlineusers", (users) => {
   });
 });
 
-arrowBackBtn.addEventListener("click", ()=>{
-    chatBox.style.display = "none";
-})
-
-
-
-
-
-
-
-
-
-// Video-call handle code yahan hai
-const muteBtn = document.querySelector(".mute");
-const speakerBtn = document.querySelector(".speaker");
-const endCallBtn = document.querySelector('.call-end');
-let muteGray = true;
-let speakerGray = true;
-const videoContainer = document.querySelector(".video-container");
-const pickupCallBox = document.querySelector(".pickup-call-box");
-const pickupCallBoxPickup = document.querySelector(".pickup-call");
-const pickupCallBoxEnd = document.querySelector(".cut-call");
-const videoCallBtn = document.querySelector('.video-call-btn');
-
-
-// it will create gray color of mute btn while user click on that
-muteBtn.addEventListener('click', ()=>{
-  if(muteGray){
-    muteBtn.style.backgroundColor = "gray";
-    muteGray = false
-  }else{
-    muteBtn.style.backgroundColor = "white";
-    muteGray = true;
-  }
-})
-
-// when user click on the speaker btn then it will do gray colo
-speakerBtn.addEventListener('click', ()=>{
-  if(speakerGray){
-    speakerBtn.style.backgroundColor = "gray";
-    speakerGray = false
-  }else{
-    speakerBtn.style.backgroundColor = "white";
-    speakerGray = true;
-  }
-})
-
-// main function that handle video calling
-let peerConnection = new RTCPeerConnection()
-let localStream;
-let remoteStream;
-
-let init = async () => {
-    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true})
-    remoteStream = new MediaStream()
-    document.getElementById('user-1').srcObject = localStream
-    document.getElementById('user-2').srcObject = remoteStream
-
-    localStream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, localStream);
-    });
-
-    peerConnection.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-        });
-    };
-}
-
-let createOffer = async () => {
-
-
-    peerConnection.onicecandidate = async (event) => {
-        //Event that fires off when a new offer ICE candidate is created
-        if(event.candidate){
-            let offerPath = JSON.stringify(peerConnection.localDescription);
-            socket.emit('offer-sdp', {offerpath : offerPath, receiverId : receiverSocketId, senderId : socket.id});
-            
-        }
-    };
-
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-}
-
-let createAnswer = async (sdpOffer, senderid) => {
-
-    let offer = JSON.parse(sdpOffer)
-
-    peerConnection.onicecandidate = async (event) => {
-        //Event that fires off when a new answer ICE candidate is created
-        if(event.candidate){
-            console.log('Adding answer candidate...:', event.candidate)
-            let sdpAnswer = JSON.stringify(peerConnection.localDescription)
-            socket.emit('sdp-answer', {answer : sdpAnswer, receiver :  senderid});
-        }
-    };
-
-    await peerConnection.setRemoteDescription(offer);
-
-    let answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer); 
-}
-
-let addAnswer = async (path) => {
-    console.log('Add answer triggerd')
-    let answer = JSON.parse(path)
-    console.log('answer:', answer)
-    if (!peerConnection.currentRemoteDescription){
-        peerConnection.setRemoteDescription(answer);
-    }
-}
-
-
-
-
-videoCallBtn.addEventListener('click', async ()=>{
-  videoContainer.style.display = 'block';
-  await init();
-  createOffer();
-})
-
-
-socket.on('sdp-offer', async (data)=>{
-  // console.log(data.data.offerpath);
-  videoContainer.style.display = "block";
-  await init();
-  createAnswer(data.data.offerpath, data.data.senderId);
-})
-
-socket.on('answer', (data) => {
-  addAnswer(data.answer);
-})
+arrowBackBtn.addEventListener("click", () => {
+  chatBox.style.display = "none";
+});
