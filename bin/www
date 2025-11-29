@@ -86,33 +86,6 @@ io.on("connection", async (socket) => {
     console.log("ReceiverAdd:", id);
   });
 
-   // --- OFFER
-  socket.on("offer", ({ from, to, offer }) => {
-    if (!to) return console.warn("offer missing 'to'");
-    io.to(to).emit("offer", { from, to, offer });
-  });
-
-  // --- ANSWER
-  socket.on("answer", ({ from, to, answer }) => {
-    // send answer to the original caller (to should be caller socket id)
-    if (!to) return console.warn("answer missing 'to'");
-    io.to(to).emit("answer", { from, to, answer });
-  });
-
-  // --- ICE Candidate
-  socket.on("icecandidate", ({ candidate, to }) => {
-    if (!to) return console.warn("icecandidate missing 'to'");
-    io.to(to).emit("icecandidate", { candidate });
-  });
-
-  // --- CALL ENDED
-  socket.on("call-ended", (caller) => {
-    if (!Array.isArray(caller) || caller.length !== 2) return;
-    const [from, to] = caller;
-    io.to(from).emit("call-ended", caller);
-    io.to(to).emit("call-ended", caller);
-  });
-
   // --- DISCONNECT EVENT ---
   socket.on("disconnect", async () => {
     // ---- REMOVE FROM onlineUsers MAP ----
