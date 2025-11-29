@@ -190,7 +190,12 @@ const PeerConnection = (function () {
   const createPeerConnection = () => {
     const config = {
       iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
+        {
+          urls: "turn:relay1.expressturn.com:3478",
+          username: "efree",
+          credential: "openrelay",
+        },
+
         // add TURN servers here for deploy (see notes below)
       ],
     };
@@ -363,13 +368,16 @@ socket.on("call-ended", (callerArr) => {
 
 // initialize app
 const startMyVideo = async () => {
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({video : true, audio : true});
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    });
     localStream = stream;
     localVideo.srcObject = stream;
-  }catch(err){
+  } catch (err) {
     console.log(err);
   }
-}
+};
 
 startMyVideo();
