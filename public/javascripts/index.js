@@ -172,88 +172,194 @@ arrowBackBtn.addEventListener("click", () => {
   chatBox.style.display = "none";
 });
 
-
 //  ---------------DATE 29-11-2025------------------------
 // ----------------------From here starting video call chat system-------------------------
 const videoContainer = document.querySelector(".video-container");
 const videoCallBtn = document.querySelector(".video-call-btn");
-const localVideo = document.getElementById('user-1');
-const remoteVideo = document.getElementById('user-2');
+const localVideo = document.getElementById("user-1");
+const remoteVideo = document.getElementById("user-2");
 const endCallBtn = document.querySelector(".call-end");
 
-
+// --- ensure these exist earlier in file ---
 let localStream;
 let caller = [];
 
-
-// Single Methodd for Peer connection
-const PeerConnection = (function(){
+// ------- PeerConnection singleton with reset support -------
+const PeerConnection = (function () {
   let peerConnection;
   const createPeerConnection = () => {
     const config = {
       iceServers: [
-        {
-          urls: 'stun:stun.l.google.com:19302'
-        }
-      ]
+        { urls: "stun:stun.l.google.com:19302" },
+        // add TURN servers here for deploy (see notes below)
+      ],
     };
-    peerConnection = new RTCPeerConnection(config);
+    const pc = new RTCPeerConnection(config);
 
-    // add local stream to peer connection
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    })
-    // listen to remote stream and add to peer conenction
-    peerConnection.ontrack = function(event) {
+    // add local stream tracks
+    if (localStream) {
+      localStream
+        .getTracks()
+        .forEach((track) => pc.addTrack(track, localStream));
+    } else {
+      console.warn("localStream not available when creating PeerConnection");
+    }
+
+    pc.ontrack = function (event) {
       remoteVideo.srcObject = event.streams[0];
-    }
-    // listen for ice candidate
-    peerConnection.onicecandidate = function(event){
-      if(event.candidate){
-        socket.emit('icecandidate', event.candidate);
+      // try autoplay
+      remoteVideo.autoplay = true;
+      remoteVideo.playsInline = true;
+    };
+
+    pc.onicecandidate = function (event) {
+      if (event.candidate) {
+        // include the recipient socket id explicitly
+        if (!caller || caller.length === 0) {
+          console.warn("No caller info when sending icecandidate");
+        }
+        const to = caller[0] === socket.id ? caller[1] : caller[0]; // best-effort
+        if (to) {
+          socket.emit("icecandidate", { candidate: event.candidate, to });
+        } else {
+          console.warn("icecandidate: no 'to' available");
+        }
       }
-    }
+    };
 
-    return peerConnection;
+    pc.onconnectionstatechange = () => {
+      console.log("PC state:", pc.connectionState);
+      if (
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "failed" ||
+        pc.connectionState === "closed"
+      ) {
+        // close and reset
+        try {
+          pc.close();
+        } catch (e) {}
+        peerConnection = null;
+      }
+    };
 
-  }
+    return pc;
+  };
+
   return {
-    getInstace: () => {
-      if(!peerConnection){
-        peerConnection = createPeerConnection();
-      }
+    getInstance: () => {
+      if (!peerConnection) peerConnection = createPeerConnection();
       return peerConnection;
-    }
-  }
+    },
+    reset: () => {
+      if (peerConnection) {
+        try {
+          peerConnection.close();
+        } catch (e) {}
+      }
+      peerConnection = null;
+    },
+  };
 })();
 
-videoCallBtn.addEventListener('click', async (e)=>{
-    videoContainer.style.display = 'block';
-    startCall(receiverSocketId);
-})
-
-endCallBtn.addEventListener('click', (e)=>{
-  socket.emit('call-ended', caller)
-})
-
-// start call method
-const startCall = async (user) => {
-  console.log(user);
-  const pc = PeerConnection.getInstace();
-  const offer = await pc.createOffer();
-  console.log(offer);
-  await pc.setLocalDescription(offer);
-  socket.emit('offer', {from : socket.id, to: user, offer: pc.localDescription});
-}
-
-// end call
-const endCall = () =>{
-  const pc = PeerConnection.getInstace();
-  if(pc) {
-    pc.close();
+// ------- start call (with defensive checks) -------
+const startCall = async (userSocketId) => {
+  if (!userSocketId) {
+    console.warn("No receiverSocketId — cannot start call");
+    flashMessage.innerHTML = "Select a user to call";
+    flashMessage.style.display = "block";
+    setTimeout(() => (flashMessage.style.display = "none"), 3000);
+    return;
   }
-}
 
+  // set caller pair: [callerSocketId, calleeSocketId]
+  caller = [socket.id, userSocketId];
+
+  const pc = PeerConnection.getInstance();
+  // if localStream available, ensure tracks added (getInstance already adds but double-check)
+  if (localStream) {
+    localStream.getTracks().forEach((track) => {
+      try {
+        pc.addTrack(track, localStream);
+      } catch (e) {}
+    });
+  }
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  // emit with explicit to
+  socket.emit("offer", {
+    from: socket.id,
+    to: userSocketId,
+    offer: pc.localDescription,
+  });
+};
+
+// ------- end call -------
+const endCall = () => {
+  // notify other side
+  if (caller && caller.length === 2) {
+    socket.emit("call-ended", caller);
+  }
+  PeerConnection.reset();
+  videoContainer.style.display = "none";
+  caller = [];
+};
+
+// UI bindings
+videoCallBtn.addEventListener("click", (e) => {
+  videoContainer.style.display = "block";
+  startCall(receiverSocketId);
+});
+
+endCallBtn.addEventListener("click", (e) => {
+  endCall();
+});
+
+// ------- socket handlers for offer/answer/ice -------
+socket.on("offer", async ({ from, to, offer }) => {
+  console.log("Received offer from", from);
+  caller = [from, socket.id];
+
+  videoContainer.style.display = "block";
+  const pc = PeerConnection.getInstance();
+
+  await pc.setRemoteDescription(offer);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+
+  socket.emit("answer", {
+    from: socket.id,
+    to: from,
+    answer: pc.localDescription,
+  });
+});
+
+socket.on("answer", async ({ from, to, answer }) => {
+  console.log("Received answer from", from);
+  const pc = PeerConnection.getInstance();
+  await pc.setRemoteDescription(answer);
+  // don't emit any end-call here
+});
+
+socket.on("icecandidate", async ({ candidate }) => {
+  try {
+    const pc = PeerConnection.getInstance();
+    if (candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  } catch (err) {
+    console.error("addIceCandidate error:", err);
+  }
+});
+
+socket.on("call-ended", (callerArr) => {
+  console.log("call-ended for", callerArr);
+  endCall();
+  flashMessage.style.display = "block";
+  flashMessage.innerHTML = "Call Ended";
+  setTimeout(() => {
+    flashMessage.style.display = "none";
+    videoContainer.style.display = "none";
+  }, 3000);
+});
 
 // initialize app
 const startMyVideo = async () => {
@@ -267,41 +373,3 @@ const startMyVideo = async () => {
 }
 
 startMyVideo();
-
-// handle socket events
-socket.on('offer', async ({from, to, offer})=>{
-
-  videoContainer.style.display = 'block';
-  const pc = PeerConnection.getInstace();
-  
-  // set local description
-  await pc.setRemoteDescription(offer);
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  socket.emit('answer', {from, to, answer: pc.localDescription});
-  caller = [from, to];
-});
-
-socket.on('answer', async ({from, to, answer})=>{
-  const pc = PeerConnection.getInstace();
-  await pc.setRemoteDescription(answer);
-  socket.emit('end-call', {from, to});
-  caller = [from, to];
-});
-
-socket.on('icecandidate', async candidate => {
-  const pc = PeerConnection.getInstace();
-  await pc.addIceCandidate(new RTCIceCandidate(candidate));
-})
-
-
-socket.on('call-ended', (caller) =>{
-  endCall();
-  flashMessage.style.display = "block";
-  flashMessage.innerHTML = "Call Ended";
-  setTimeout(() => {
-    flashMessage.style.display = "none";
-    flashMessage.innerHTML = "";
-    videoContainer.style.display = "none";
-  }, 3000);
-})

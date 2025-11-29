@@ -29,10 +29,9 @@ var { Server } = require("socket.io");
 var io = new Server(server);
 module.exports.io = io;
 
-const onlineUsers = new Map();  // <-- FIXED
+const onlineUsers = new Map(); // <-- FIXED
 
 io.on("connection", async (socket) => {
-
   console.log("User connected to server.");
 
   let decoded;
@@ -59,11 +58,12 @@ io.on("connection", async (socket) => {
         });
 
         // Emit to all clients
-        io.emit('onlineusers',
+        io.emit(
+          "onlineusers",
           Array.from(onlineUsers.entries()).map(([id, info]) => ({
             socketId: id,
             fullname: info.fullname,
-            email: info.email
+            email: info.email,
           }))
         );
 
@@ -74,27 +74,52 @@ io.on("connection", async (socket) => {
     console.log("Token error:", err.message);
   }
 
-
   // --- MESSAGE EVENT ---
   socket.on("message", ({ msg, id }) => {
     io.to(id).emit("msg", {
       from: socket.id,
       msg,
-      fullname : user.fullname
+      fullname: user.fullname,
     });
 
     console.log("message:", msg);
     console.log("ReceiverAdd:", id);
   });
-  
+
+   // --- OFFER
+  socket.on("offer", ({ from, to, offer }) => {
+    if (!to) return console.warn("offer missing 'to'");
+    io.to(to).emit("offer", { from, to, offer });
+  });
+
+  // --- ANSWER
+  socket.on("answer", ({ from, to, answer }) => {
+    // send answer to the original caller (to should be caller socket id)
+    if (!to) return console.warn("answer missing 'to'");
+    io.to(to).emit("answer", { from, to, answer });
+  });
+
+  // --- ICE Candidate
+  socket.on("icecandidate", ({ candidate, to }) => {
+    if (!to) return console.warn("icecandidate missing 'to'");
+    io.to(to).emit("icecandidate", { candidate });
+  });
+
+  // --- CALL ENDED
+  socket.on("call-ended", (caller) => {
+    if (!Array.isArray(caller) || caller.length !== 2) return;
+    const [from, to] = caller;
+    io.to(from).emit("call-ended", caller);
+    io.to(to).emit("call-ended", caller);
+  });
 
   // --- DISCONNECT EVENT ---
   socket.on("disconnect", async () => {
-
     // ---- REMOVE FROM onlineUsers MAP ----
     onlineUsers.delete(socket.id);
 
-    io.emit('onlineusers',
+    io.emit(
+      "onlineusers",
       Array.from(onlineUsers.entries()).map(([id, info]) => ({
         socketId: id,
         fullname: info.fullname,
@@ -113,39 +138,10 @@ io.on("connection", async (socket) => {
     } catch (err) {
       console.log("Disconnect error:", err.message);
     }
-
   });
 
-  // Signaling for connect video call        
-let target;
-
-socket.on('offer', ({from, to, offer}) => {
-  target = to;  // store actual socket ID
-  
-  io.to(target).emit('offer', {from, to, offer});
+ 
 });
-
-socket.on('answer', ({from, to, answer}) => {
-  io.to(from).emit('answer', {from, to, answer});
-});
-
-socket.on('icecandidate', candidate => {
-  io.to(target).emit('icecandidate', candidate);
-});
-
-socket.on('end-call', ({from, to})=>{
-  io.to(to).emit('end-call', {from, to});
-})
-
-socket.on('call-ended', caller => {
-  const [from, to] = caller;
-  io.to(from).emit('call-ended', caller);
-  io.to(to).emit('call-ended', caller);
-})
-
-
-});
-
 
 /**
  * Listen on provided port, on all network interfaces.
